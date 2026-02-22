@@ -3,6 +3,9 @@
 All tests run without network access (DNS tests are marked integration).
 """
 
+from unittest.mock import patch
+
+import dns.resolver
 import pytest
 
 from mailcheck import (
@@ -242,6 +245,52 @@ class TestValidateEmailFullIntegration:
         assert result["did_you_mean"] == "user@gmail.com"
 
 
+class TestCheckMxDnsErrorDistinction:
+    """Verify check_mx distinguishes NXDOMAIN (definitive) from infra errors."""
+
+    def test_nxdomain_has_no_error_key(self):
+        with patch("mailcheck.dns.resolver.resolve", side_effect=dns.resolver.NXDOMAIN):
+            result = check_mx("nonexistent.example")
+        assert result["mx_found"] is False
+        assert "error" not in result
+
+    def test_no_answer_has_no_error_key(self):
+        with patch("mailcheck.dns.resolver.resolve", side_effect=dns.resolver.NoAnswer):
+            result = check_mx("no-mx.example")
+        assert result["mx_found"] is False
+        assert "error" not in result
+
+    def test_timeout_has_error_key(self):
+        with patch("mailcheck.dns.resolver.resolve", side_effect=dns.resolver.LifetimeTimeout):
+            result = check_mx("slow.example")
+        assert result["mx_found"] is False
+        assert "error" in result
+        assert "LifetimeTimeout" in result["error"]
+
+    def test_no_nameservers_has_error_key(self):
+        with patch("mailcheck.dns.resolver.resolve", side_effect=dns.resolver.NoNameservers):
+            result = check_mx("broken.example")
+        assert result["mx_found"] is False
+        assert "error" in result
+        assert "NoNameservers" in result["error"]
+
+
+class TestValidateEmailFullDnsError:
+    """Verify validate_email_full returns 'unknown' status on DNS infra failure."""
+
+    def test_dns_timeout_returns_unknown(self):
+        with patch("mailcheck.dns.resolver.resolve", side_effect=dns.resolver.LifetimeTimeout):
+            result = validate_email_full("user@example.com")
+        assert result["status"] == "unknown"
+        assert result["syntax_valid"] is True
+        assert result["mx_found"] is False
+
+    def test_nxdomain_returns_invalid(self):
+        with patch("mailcheck.dns.resolver.resolve", side_effect=dns.resolver.NXDOMAIN):
+            result = validate_email_full("user@nonexistent-domain-xyz.com")
+        assert result["status"] == "invalid"
+
+
 class TestCheckMxIntegration:
     """Real DNS MX lookups."""
 
@@ -251,8 +300,10 @@ class TestCheckMxIntegration:
         result = check_mx("gmail.com")
         assert result["mx_found"] is True
         assert len(result["mx_records"]) > 0
+        assert "error" not in result
 
     def test_nonexistent_domain(self):
         result = check_mx("this-domain-definitely-does-not-exist-12345.com")
         assert result["mx_found"] is False
         assert result["mx_records"] == []
+        assert "error" not in result  # NXDOMAIN is definitive, not an error

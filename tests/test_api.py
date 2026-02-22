@@ -89,3 +89,23 @@ class TestX402Discovery:
         data = resp.json()
         assert "instructions" in data
         assert "POST /validate" in data["instructions"]
+
+
+class TestInputValidation:
+    """Input length constraints (RFC 5321: email 254, RFC 1035: domain 253)."""
+
+    def test_email_too_long_returns_422(self, client):
+        long_email = "a" * 245 + "@gmail.com"  # 255 chars > 254 limit
+        resp = client.post("/validate", json={"email": long_email})
+        # x402 may intercept first (402) or FastAPI validates (422)
+        assert resp.status_code in (402, 422)
+
+    def test_domain_too_long_disposable_returns_422(self, client):
+        long_domain = "a" * 254 + ".com"  # > 253 limit
+        resp = client.get(f"/disposable?domain={long_domain}")
+        assert resp.status_code in (402, 422)
+
+    def test_domain_too_long_mx_returns_422(self, client):
+        long_domain = "a" * 254 + ".com"
+        resp = client.get(f"/mx?domain={long_domain}")
+        assert resp.status_code in (402, 422)

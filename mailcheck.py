@@ -76,7 +76,11 @@ def check_disposable(domain: str) -> bool:
 
 
 def check_mx(domain: str) -> dict[str, Any]:
-    """Query DNS MX records for domain. Returns found flag + record list."""
+    """Query DNS MX records for domain. Returns found flag + record list.
+
+    The "error" key is only present when DNS infrastructure fails (timeout,
+    no nameservers). Definitive "no MX" (NXDOMAIN, NoAnswer) omits it.
+    """
     try:
         answers = dns.resolver.resolve(domain, "MX")
         records = sorted(
@@ -87,14 +91,16 @@ def check_mx(domain: str) -> dict[str, Any]:
             "mx_found": True,
             "mx_records": [rec[1] for rec in records],
         }
+    except (dns.resolver.NoAnswer, dns.resolver.NXDOMAIN):
+        # Definitive: domain exists but has no MX, or domain doesn't exist
+        return {"mx_found": False, "mx_records": []}
     except (
-        dns.resolver.NoAnswer,
-        dns.resolver.NXDOMAIN,
         dns.resolver.NoNameservers,
         dns.resolver.LifetimeTimeout,
         dns.exception.DNSException,
-    ):
-        return {"mx_found": False, "mx_records": []}
+    ) as e:
+        # Infrastructure failure: can't determine MX status
+        return {"mx_found": False, "mx_records": [], "error": f"dns_error: {type(e).__name__}"}
 
 
 def check_free(domain: str) -> bool:
@@ -215,6 +221,8 @@ def validate_email_full(email: str) -> dict[str, Any]:
 
     if is_disposable:
         status = "disposable"
+    elif "error" in mx:
+        status = "unknown"  # DNS infrastructure failure — can't determine validity
     elif not mx["mx_found"]:
         status = "invalid"
     elif score >= 0.7:

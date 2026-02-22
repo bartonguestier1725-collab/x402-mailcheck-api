@@ -13,10 +13,11 @@ Endpoints:
 """
 
 import os
+from contextlib import asynccontextmanager
 
 from dotenv import load_dotenv
 from fastapi import FastAPI, Query, Request, Response
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from x402.http import FacilitatorConfig, HTTPFacilitatorClient, PaymentOption
 from x402.http.middleware.fastapi import PaymentMiddlewareASGI
@@ -38,8 +39,12 @@ RAPIDAPI_PROXY_SECRET = os.getenv("RAPIDAPI_PROXY_SECRET")
 
 if not EVM_ADDRESS:
     import warnings
-    warnings.warn("EVM_ADDRESS not set — payment middleware will be non-functional", stacklevel=1)
-    EVM_ADDRESS = "0x0000000000000000000000000000000000000000"
+    warnings.warn(
+        "EVM_ADDRESS not set — payment middleware will be non-functional. "
+        "Server startup will be blocked unless this is a test environment.",
+        stacklevel=1,
+    )
+    EVM_ADDRESS = "0xDEAD000000000000000000000000000000000000"  # sentinel, never valid
 
 # --- Business logic ---
 from mailcheck import (
@@ -50,7 +55,7 @@ from mailcheck import (
 
 # --- Response schemas ---
 class ValidateRequest(BaseModel):
-    email: str
+    email: str = Field(max_length=254)  # RFC 5321
 
 
 class ValidateResponse(BaseModel):
@@ -85,13 +90,26 @@ class HealthResponse(BaseModel):
     network: str
 
 
+# --- Lifespan (startup guard: catches uvicorn main:app without .env) ---
+@asynccontextmanager
+async def lifespan(app):
+    if not os.getenv("EVM_ADDRESS"):
+        raise RuntimeError(
+            "FATAL: EVM_ADDRESS not set. Payments would go to a dead address. "
+            "Set EVM_ADDRESS in .env before starting the server."
+        )
+    yield
+
+
 # --- App ---
 app = FastAPI(
     title="Mailcheck API",
     description="Email validation API for AI agents. "
     "Checks syntax, MX records, disposable domains, free providers, role-based addresses, and typos.",
     version="0.1.0",
+    lifespan=lifespan,
 )
+
 
 # --- x402 Payment Middleware ---
 CDP_API_KEY_ID = os.getenv("CDP_API_KEY_ID")
@@ -208,7 +226,7 @@ class PaymentWithRapidAPIBypass:
     async def __call__(self, scope, receive, send):
         if scope["type"] == "http" and RAPIDAPI_PROXY_SECRET:
             headers = dict(scope.get("headers", []))
-            secret = headers.get(b"x-rapidapi-proxy-secret", b"").decode()
+            secret = headers.get(b"x-rapidapi-proxy-secret", b"").decode(errors="replace")
             if secret and secret == RAPIDAPI_PROXY_SECRET:
                 return await self.raw_app(scope, receive, send)
         return await self.payment_app(scope, receive, send)
@@ -270,7 +288,7 @@ async def validate_email_endpoint(body: ValidateRequest) -> ValidateResponse:
 
 @app.get("/disposable")
 async def disposable_check(
-    domain: str = Query(description="Domain to check (e.g., guerrillamail.com)"),
+    domain: str = Query(max_length=253, description="Domain to check (e.g., guerrillamail.com)"),
 ) -> DisposableResponse:
     return DisposableResponse(
         domain=domain,
@@ -280,7 +298,7 @@ async def disposable_check(
 
 @app.get("/mx")
 async def mx_check(
-    domain: str = Query(description="Domain to look up MX records for (e.g., gmail.com)"),
+    domain: str = Query(max_length=253, description="Domain to look up MX records for (e.g., gmail.com)"),
 ) -> MxResponse:
     result = check_mx(domain)
     return MxResponse(
