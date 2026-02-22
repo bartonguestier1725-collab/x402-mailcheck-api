@@ -1,0 +1,30 @@
+[project]
+name = "x402-mailcheck-api"
+version = "0.1.0"
+description = "Email validation API for AI agents, powered by x402 micropayments"
+requires-python = ">=3.10"
+dependencies = [
+    "x402[fastapi,evm]>=2.1.0",
+    "uvicorn>=0.30.0",
+    "python-dotenv>=1.0.0",
+    "email-validator>=2.0.0",
+    "dnspython>=2.6.0",
+    "disposable-email-domains>=0.0.99",
+    "free-email-domains>=0.0.3",
+    "cdp-sdk>=1.39.1",
+    "jsonschema>=4.20",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-timeout>=2.3",
+    "httpx>=0.27",
+]
+
+[tool.pytest.ini_options]
+timeout = 10
+markers = [
+    "integration: requires network access (DNS lookups, x402 payments)",
+]
+addopts = "-m 'not integration'"
