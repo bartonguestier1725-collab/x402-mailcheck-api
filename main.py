@@ -330,6 +330,16 @@ async def x402_discovery(request: Request):
     }
 
 
+# --- RapidAPI OpenAPI spec (optimized for import) ---
+@app.get("/rapidapi.json", include_in_schema=False)
+async def rapidapi_spec():
+    import json
+    from pathlib import Path
+    from fastapi.responses import JSONResponse
+    spec = json.loads(Path(__file__).parent.joinpath("rapidapi-openapi.json").read_text())
+    return JSONResponse(spec)
+
+
 # --- Routes ---
 @app.get("/health")
 async def health_check() -> HealthResponse:
@@ -337,8 +347,49 @@ async def health_check() -> HealthResponse:
 
 
 @app.post("/validate")
-async def validate_email_endpoint(body: ValidateRequest) -> ValidateResponse:
-    result = validate_email_full(body.email)
+async def validate_email_endpoint(request: Request) -> ValidateResponse:
+    """Accept JSON body, form data, or query parameter — robust against
+    RapidAPI Playground which may send non-JSON Content-Type."""
+    email = None
+    content_type = request.headers.get("content-type", "")
+
+    if "application/json" in content_type:
+        data = await request.json()
+        email = data.get("email") if isinstance(data, dict) else None
+    elif "application/x-www-form-urlencoded" in content_type or "multipart/form-data" in content_type:
+        form = await request.form()
+        email = form.get("email")
+    else:
+        # Try JSON first (RapidAPI sometimes omits Content-Type)
+        raw = await request.body()
+        if raw:
+            import json as _json
+            try:
+                data = _json.loads(raw)
+                email = data.get("email") if isinstance(data, dict) else None
+            except (ValueError, AttributeError):
+                email = raw.decode(errors="replace").strip()
+
+    # Fallback: query parameter
+    if not email:
+        email = request.query_params.get("email")
+
+    if not email:
+        from fastapi.responses import JSONResponse
+        return JSONResponse(
+            status_code=422,
+            content={"detail": [{"loc": ["body", "email"], "msg": "field required", "type": "value_error.missing"}]},
+        )
+
+    # Validate length (RFC 5321: max 254)
+    if len(email) > 254:
+        from fastapi.responses import JSONResponse
+        return JSONResponse(
+            status_code=422,
+            content={"detail": [{"loc": ["body", "email"], "msg": "max length is 254", "type": "value_error"}]},
+        )
+
+    result = validate_email_full(email)
     return ValidateResponse(**result)
 
 

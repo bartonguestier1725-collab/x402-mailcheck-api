@@ -1,0 +1,353 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Email Validation API",
+    "description": "Fast, accurate email validation without risky SMTP probing. 6 checks in 1 call: syntax, MX records, disposable domains (5000+), free provider detection, role-based address detection, and typo suggestions. Built for AI agents and automation.",
+    "version": "1.0.0",
+    "contact": {
+      "name": "API Support",
+      "url": "https://github.com/bartonguestier1725-collab/x402-mailcheck-api"
+    }
+  },
+  "servers": [
+    {
+      "url": "https://mailcheck.hugen.tokyo",
+      "description": "Production"
+    }
+  ],
+  "paths": {
+    "/validate": {
+      "post": {
+        "summary": "Validate Email",
+        "description": "Full email validation with 6 non-invasive checks: syntax (RFC 5321), MX record lookup, disposable domain detection, free provider detection, role-based address detection, and typo suggestion. POST method protects email addresses (PII) from appearing in access logs.",
+        "operationId": "validateEmail",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ValidateRequest"
+              },
+              "example": {
+                "email": "user@gmail.com"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Validation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidateResponse"
+                },
+                "example": {
+                  "email": "user@gmail.com",
+                  "status": "valid",
+                  "score": 0.95,
+                  "syntax_valid": true,
+                  "domain": "gmail.com",
+                  "mx_found": true,
+                  "mx_records": ["gmail-smtp-in.l.google.com", "alt1.gmail-smtp-in.l.google.com"],
+                  "is_disposable": false,
+                  "is_free": true,
+                  "is_role_based": false,
+                  "did_you_mean": null,
+                  "checks_performed": ["syntax", "mx", "disposable", "free", "role", "typo"]
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error (invalid input)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/disposable": {
+      "get": {
+        "summary": "Check Disposable Domain",
+        "description": "Check if a domain is a known disposable/temporary email provider. Uses a curated blocklist of 5000+ disposable domains (CC0 licensed, continuously updated).",
+        "operationId": "checkDisposable",
+        "parameters": [
+          {
+            "name": "domain",
+            "in": "query",
+            "required": true,
+            "description": "Domain to check (e.g., guerrillamail.com, mailinator.com)",
+            "schema": {
+              "type": "string",
+              "maxLength": 253
+            },
+            "example": "guerrillamail.com"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Disposable check result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DisposableResponse"
+                },
+                "example": {
+                  "domain": "guerrillamail.com",
+                  "is_disposable": true
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/mx": {
+      "get": {
+        "summary": "MX Record Lookup",
+        "description": "Look up MX (Mail Exchange) DNS records for a domain. Returns whether mail servers exist and their hostnames sorted by priority. Useful for verifying a domain can receive email.",
+        "operationId": "mxLookup",
+        "parameters": [
+          {
+            "name": "domain",
+            "in": "query",
+            "required": true,
+            "description": "Domain to look up MX records for (e.g., gmail.com, company.co.jp)",
+            "schema": {
+              "type": "string",
+              "maxLength": 253
+            },
+            "example": "gmail.com"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "MX lookup result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MxResponse"
+                },
+                "example": {
+                  "domain": "gmail.com",
+                  "mx_found": true,
+                  "mx_records": ["gmail-smtp-in.l.google.com", "alt1.gmail-smtp-in.l.google.com", "alt2.gmail-smtp-in.l.google.com"]
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/health": {
+      "get": {
+        "summary": "Health Check",
+        "description": "API health check endpoint. Always free, no authentication required.",
+        "operationId": "healthCheck",
+        "responses": {
+          "200": {
+            "description": "API is healthy",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponse"
+                },
+                "example": {
+                  "status": "ok",
+                  "service": "mailcheck",
+                  "network": "eip155:8453"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "ValidateRequest": {
+        "type": "object",
+        "required": ["email"],
+        "properties": {
+          "email": {
+            "type": "string",
+            "maxLength": 254,
+            "description": "Email address to validate (RFC 5321 format)",
+            "example": "user@gmail.com"
+          }
+        }
+      },
+      "ValidateResponse": {
+        "type": "object",
+        "required": ["email", "status", "score", "syntax_valid", "domain", "mx_found", "mx_records", "is_disposable", "is_free", "is_role_based", "did_you_mean", "checks_performed"],
+        "properties": {
+          "email": {
+            "type": "string",
+            "description": "The email address that was validated"
+          },
+          "status": {
+            "type": "string",
+            "description": "Overall status: valid, risky, or invalid",
+            "enum": ["valid", "risky", "invalid"]
+          },
+          "score": {
+            "type": "number",
+            "description": "Confidence score from 0.0 (definitely bad) to 1.0 (definitely good)",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "syntax_valid": {
+            "type": "boolean",
+            "description": "Whether the email syntax is valid per RFC 5321"
+          },
+          "domain": {
+            "type": "string",
+            "nullable": true,
+            "description": "Extracted domain part (null if syntax invalid)"
+          },
+          "mx_found": {
+            "type": "boolean",
+            "description": "Whether MX records were found for the domain"
+          },
+          "mx_records": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "List of MX hostnames sorted by priority"
+          },
+          "is_disposable": {
+            "type": "boolean",
+            "description": "Whether the domain is a known disposable/temporary email provider"
+          },
+          "is_free": {
+            "type": "boolean",
+            "description": "Whether the domain is a free email provider (Gmail, Yahoo, etc.)"
+          },
+          "is_role_based": {
+            "type": "boolean",
+            "description": "Whether the local part is role-based (info@, admin@, support@, etc.)"
+          },
+          "did_you_mean": {
+            "type": "string",
+            "nullable": true,
+            "description": "Typo suggestion if a common misspelling was detected (e.g., gmial.com → gmail.com)"
+          },
+          "checks_performed": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "List of checks that were performed"
+          }
+        }
+      },
+      "DisposableResponse": {
+        "type": "object",
+        "required": ["domain", "is_disposable"],
+        "properties": {
+          "domain": {
+            "type": "string",
+            "description": "The domain that was checked"
+          },
+          "is_disposable": {
+            "type": "boolean",
+            "description": "Whether the domain is a known disposable email provider"
+          }
+        }
+      },
+      "MxResponse": {
+        "type": "object",
+        "required": ["domain", "mx_found", "mx_records"],
+        "properties": {
+          "domain": {
+            "type": "string",
+            "description": "The domain that was looked up"
+          },
+          "mx_found": {
+            "type": "boolean",
+            "description": "Whether any MX records were found"
+          },
+          "mx_records": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "MX hostnames sorted by priority"
+          }
+        }
+      },
+      "HealthResponse": {
+        "type": "object",
+        "required": ["status", "service", "network"],
+        "properties": {
+          "status": {
+            "type": "string",
+            "description": "Service status"
+          },
+          "service": {
+            "type": "string",
+            "description": "Service name"
+          },
+          "network": {
+            "type": "string",
+            "description": "Blockchain network"
+          }
+        }
+      },
+      "HTTPValidationError": {
+        "type": "object",
+        "properties": {
+          "detail": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            }
+          }
+        }
+      },
+      "ValidationError": {
+        "type": "object",
+        "required": ["loc", "msg", "type"],
+        "properties": {
+          "loc": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Error location"
+          },
+          "msg": {
+            "type": "string",
+            "description": "Error message"
+          },
+          "type": {
+            "type": "string",
+            "description": "Error type"
+          }
+        }
+      }
+    }
+  }
+}
