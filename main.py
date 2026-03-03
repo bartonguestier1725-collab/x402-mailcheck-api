@@ -23,7 +23,7 @@ from pydantic import BaseModel, Field
 
 from x402.http import FacilitatorConfig, HTTPFacilitatorClient, PaymentOption
 from x402.http.middleware.fastapi import PaymentMiddlewareASGI
-from x402.http.types import RouteConfig
+from x402.http.types import RouteConfig, UnpaidResponseResult
 from x402.mechanisms.evm.exact import ExactEvmServerScheme
 from x402.schemas import Network
 from x402.extensions.bazaar import bazaar_resource_server_extension
@@ -130,6 +130,16 @@ server.register_extension(bazaar_resource_server_extension)
 PRICE = "$0.001"
 PAYMENT = PaymentOption(scheme="exact", pay_to=EVM_ADDRESS, price=PRICE, network=NETWORK)
 
+
+# --- 402 Sample Responses (show agents what they'd get if they paid) ---
+def _sample(example: dict):
+    """Factory: returns unpaid_response_body callback with sample data."""
+    body = {"_notice": "Payment required ($0.001 USDC on Base). Sample response below.", **example}
+    def callback(_ctx):
+        return UnpaidResponseResult(content_type="application/json", body=body)
+    return callback
+
+
 routes = {
     "POST /validate": RouteConfig(
         accepts=[PAYMENT],
@@ -137,6 +147,14 @@ routes = {
         description="Full email validation: syntax, MX records, disposable check, "
         "free provider detection, role-based address detection, and typo suggestion. "
         "POST method protects email addresses (PII) from appearing in access logs.",
+        unpaid_response_body=_sample({
+            "email": "user@gmail.com", "status": "valid", "score": 0.95,
+            "syntax_valid": True, "domain": "gmail.com", "mx_found": True,
+            "mx_records": ["gmail-smtp-in.l.google.com"],
+            "is_disposable": False, "is_free": True, "is_role_based": False,
+            "did_you_mean": None,
+            "checks_performed": ["syntax", "mx", "disposable", "free", "role", "typo"],
+        }),
         extensions={
             "bazaar": {
                 "info": {
@@ -170,6 +188,9 @@ routes = {
         mime_type="application/json",
         description="Check if a domain is a known disposable/temporary email provider. "
         "Uses a curated blocklist of 5000+ disposable domains (CC0 licensed).",
+        unpaid_response_body=_sample({
+            "domain": "guerrillamail.com", "is_disposable": True,
+        }),
         extensions={
             "bazaar": {
                 "info": {
@@ -193,6 +214,10 @@ routes = {
         mime_type="application/json",
         description="Look up MX (Mail Exchange) DNS records for a domain. "
         "Returns whether mail servers exist and their hostnames sorted by priority.",
+        unpaid_response_body=_sample({
+            "domain": "gmail.com", "mx_found": True,
+            "mx_records": ["gmail-smtp-in.l.google.com", "alt1.gmail-smtp-in.l.google.com"],
+        }),
         extensions={
             "bazaar": {
                 "info": {
