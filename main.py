@@ -127,14 +127,15 @@ server = x402ResourceServer(facilitator)
 server.register(NETWORK, ExactEvmServerScheme())
 server.register_extension(bazaar_resource_server_extension)
 
-PRICE = "$0.001"
+
+PRICE = "$0.005"
 PAYMENT = PaymentOption(scheme="exact", pay_to=EVM_ADDRESS, price=PRICE, network=NETWORK)
 
 
 # --- 402 Sample Responses (show agents what they'd get if they paid) ---
 def _sample(example: dict):
     """Factory: returns unpaid_response_body callback with sample data."""
-    body = {"_notice": "Payment required ($0.001 USDC on Base). Sample response below.", **example}
+    body = {"_notice": "Payment required ($0.005 USDC on Base). Sample response below.", **example}
     def callback(_ctx):
         return UnpaidResponseResult(content_type="application/json", body=body)
     return callback
@@ -144,9 +145,10 @@ routes = {
     "POST /validate": RouteConfig(
         accepts=[PAYMENT],
         mime_type="application/json",
-        description="Full email validation: syntax, MX records, disposable check, "
-        "free provider detection, role-based address detection, and typo suggestion. "
-        "POST method protects email addresses (PII) from appearing in access logs.",
+        description="Comprehensive email validation: syntax (RFC 5322), MX records, disposable detection (5,000+ domains), "
+        "free provider check (Gmail, Yahoo, Outlook), role-based detection (admin@, info@), typo suggestion (gmial.com). "
+        "Returns 0-1 confidence score with detailed per-check results. POST protects email addresses from access logs. "
+        "AI agent API for lead qualification, signup fraud prevention, CRM hygiene, email deliverability",
         unpaid_response_body=_sample({
             "email": "user@gmail.com", "status": "valid", "score": 0.95,
             "syntax_valid": True, "domain": "gmail.com", "mx_found": True,
@@ -186,8 +188,10 @@ routes = {
     "GET /disposable": RouteConfig(
         accepts=[PAYMENT],
         mime_type="application/json",
-        description="Check if a domain is a known disposable/temporary email provider. "
-        "Uses a curated blocklist of 5000+ disposable domains (CC0 licensed).",
+        description="Check if a domain is a known disposable or temporary email provider — covers Guerrilla Mail, "
+        "Mailinator, Temp Mail, 10MinuteMail, and 5,000+ disposable domains from a community-curated blocklist "
+        "(CC0 licensed, updated regularly). Returns instant boolean result. "
+        "AI agent API for signup fraud detection, form spam prevention, and email quality filtering",
         unpaid_response_body=_sample({
             "domain": "guerrillamail.com", "is_disposable": True,
         }),
@@ -212,8 +216,11 @@ routes = {
     "GET /mx": RouteConfig(
         accepts=[PAYMENT],
         mime_type="application/json",
-        description="Look up MX (Mail Exchange) DNS records for a domain. "
-        "Returns whether mail servers exist and their hostnames sorted by priority.",
+        description="Look up MX (Mail Exchange) DNS records for any domain — returns whether mail servers exist "
+        "and their hostnames sorted by priority. Essential for verifying email deliverability before sending. "
+        "Supports all TLDs including ccTLDs and new gTLDs. "
+        "AI agent API for email infrastructure verification, domain reputation assessment, "
+        "and bulk email pre-send validation",
         unpaid_response_body=_sample({
             "domain": "gmail.com", "mx_found": True,
             "mx_records": ["gmail-smtp-in.l.google.com", "alt1.gmail-smtp-in.l.google.com"],
@@ -263,7 +270,7 @@ class PaymentWithRapidAPIBypass:
 class AccessLogMiddleware:
     """ASGI middleware — logs requests to paid endpoints for analytics."""
 
-    _SKIP = frozenset({"/health", "/.well-known/x402", "/openapi.json", "/docs", "/redoc"})
+    _SKIP = frozenset({"/health", "/.well-known/x402", "/openapi.json", "/llms.txt", "/docs", "/redoc"})
 
     def __init__(self, app):
         self.app = app
@@ -346,7 +353,7 @@ async def x402_discovery(request: Request):
             "- `GET /disposable?domain=example.com` — Disposable domain check\n"
             "- `GET /mx?domain=example.com` — MX record lookup\n\n"
             "## Pricing\n"
-            "All endpoints: $0.001/request (USDC on Base)\n\n"
+            "All endpoints: $0.005/request (USDC on Base)\n\n"
             "## Note\n"
             "POST /validate uses POST to protect email addresses (PII) from access logs.\n\n"
             "## Contact\n"
@@ -369,6 +376,42 @@ async def rapidapi_spec():
 @app.get("/health")
 async def health_check() -> HealthResponse:
     return HealthResponse(status="ok", service="mailcheck", network=NETWORK)
+
+
+@app.get("/llms.txt")
+async def llms_txt():
+    """Machine-readable API description for LLM agents."""
+    content = """\
+# Email Validation API — Mailcheck
+
+> Validate email addresses with syntax, MX record, disposable domain, free provider, role-based, and typo detection checks. Built for AI agents that need to verify emails before sending.
+
+## API Base URL
+
+https://mailcheck.hugen.tokyo
+
+## Authentication
+
+This API uses the x402 protocol for micropayments. Include a valid x402 payment header with each request. Payments are in USDC on Base chain (eip155:8453).
+
+## Discovery
+
+- Payment info: GET /.well-known/x402
+- OpenAPI spec: GET /openapi.json
+
+## Endpoints — $0.005/request
+
+- POST /validate — Full email validation (syntax + MX + disposable + free + role-based + typo suggestion). Send JSON body: {"email": "user@example.com"}
+- GET /disposable?domain={domain} — Check if a domain is a known disposable/temporary email provider
+- GET /mx?domain={domain} — MX record lookup and validation
+
+## Pricing
+
+- All endpoints: $0.005 USDC per request
+- Network: Base (eip155:8453)
+- Payment: x402 protocol (USDC)
+"""
+    return Response(content=content, media_type="text/plain; charset=utf-8")
 
 
 @app.post("/validate")
