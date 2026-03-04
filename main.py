@@ -161,7 +161,8 @@ routes = {
             "bazaar": {
                 "info": {
                     "input": {
-                        "type": "json",
+                        "type": "http",
+                        "bodyType": "json",
                         "example": {"email": "user@gmail.com"},
                     },
                     "output": {
