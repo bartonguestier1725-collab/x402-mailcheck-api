@@ -38,6 +38,7 @@ FACILITATOR_URL = os.getenv("FACILITATOR_URL", "https://x402.org/facilitator")
 HOST = os.getenv("HOST", "0.0.0.0")
 PORT = int(os.getenv("PORT", "4024"))
 RAPIDAPI_PROXY_SECRET = os.getenv("RAPIDAPI_PROXY_SECRET")
+INTERNAL_KEY = os.getenv("INTERNAL_KEY", "")
 
 if not EVM_ADDRESS:
     import warnings
@@ -127,9 +128,19 @@ server = x402ResourceServer(facilitator)
 server.register(NETWORK, ExactEvmServerScheme())
 server.register_extension(bazaar_resource_server_extension)
 
+# Solana support (Dexter market — activated by SOLANA_PAY_TO env var)
+SOLANA_PAY_TO = os.getenv("SOLANA_PAY_TO", "")
+if SOLANA_PAY_TO:
+    from x402.mechanisms.svm.constants import SOLANA_MAINNET_CAIP2
+    from x402.mechanisms.svm.exact import ExactSvmServerScheme
+    server.register(SOLANA_MAINNET_CAIP2, ExactSvmServerScheme())
+
 
 PRICE = "$0.005"
 PAYMENT = PaymentOption(scheme="exact", pay_to=EVM_ADDRESS, price=PRICE, network=NETWORK)
+ACCEPTS = [PAYMENT]
+if SOLANA_PAY_TO:
+    ACCEPTS.append(PaymentOption(scheme="exact", pay_to=SOLANA_PAY_TO, price=PRICE, network=SOLANA_MAINNET_CAIP2))
 
 
 # --- 402 Sample Responses (show agents what they'd get if they paid) ---
@@ -143,12 +154,12 @@ def _sample(example: dict):
 
 routes = {
     "POST /validate": RouteConfig(
-        accepts=[PAYMENT],
+        accepts=ACCEPTS,
         mime_type="application/json",
         description="Comprehensive email validation: syntax (RFC 5322), MX records, disposable detection (5,000+ domains), "
         "free provider check (Gmail, Yahoo, Outlook), role-based detection (admin@, info@), typo suggestion (gmial.com). "
         "Returns 0-1 confidence score with detailed per-check results. POST protects email addresses from access logs. "
-        "AI agent API for lead qualification, signup fraud prevention, CRM hygiene, email deliverability",
+        "AI agent API for lead qualification, signup fraud prevention, CRM hygiene, email deliverability. Accepts USDC payments on Base and Solana",
         unpaid_response_body=_sample({
             "email": "user@gmail.com", "status": "valid", "score": 0.95,
             "syntax_valid": True, "domain": "gmail.com", "mx_found": True,
@@ -187,12 +198,12 @@ routes = {
         },
     ),
     "GET /disposable": RouteConfig(
-        accepts=[PAYMENT],
+        accepts=ACCEPTS,
         mime_type="application/json",
         description="Check if a domain is a known disposable or temporary email provider — covers Guerrilla Mail, "
         "Mailinator, Temp Mail, 10MinuteMail, and 5,000+ disposable domains from a community-curated blocklist "
         "(CC0 licensed, updated regularly). Returns instant boolean result. "
-        "AI agent API for signup fraud detection, form spam prevention, and email quality filtering",
+        "AI agent API for signup fraud detection, form spam prevention, and email quality filtering. Accepts USDC payments on Base and Solana",
         unpaid_response_body=_sample({
             "domain": "guerrillamail.com", "is_disposable": True,
         }),
@@ -215,13 +226,13 @@ routes = {
         },
     ),
     "GET /mx": RouteConfig(
-        accepts=[PAYMENT],
+        accepts=ACCEPTS,
         mime_type="application/json",
         description="Look up MX (Mail Exchange) DNS records for any domain — returns whether mail servers exist "
         "and their hostnames sorted by priority. Essential for verifying email deliverability before sending. "
         "Supports all TLDs including ccTLDs and new gTLDs. "
         "AI agent API for email infrastructure verification, domain reputation assessment, "
-        "and bulk email pre-send validation",
+        "and bulk email pre-send validation. Accepts USDC payments on Base and Solana",
         unpaid_response_body=_sample({
             "domain": "gmail.com", "mx_found": True,
             "mx_records": ["gmail-smtp-in.l.google.com", "alt1.gmail-smtp-in.l.google.com"],
@@ -252,19 +263,39 @@ routes = {
 # When x-rapidapi-proxy-secret matches, skip x402 payment entirely.
 # Pattern from scout-mcp (server.ts:272), adapted for ASGI.
 class PaymentWithRapidAPIBypass:
-    """Wraps PaymentMiddlewareASGI with RapidAPI proxy secret bypass."""
+    """Wraps PaymentMiddlewareASGI with RapidAPI proxy secret bypass.
+
+    Safety net: if the facilitator is unreachable (DNS failure, timeout),
+    return 502 instead of letting the unhandled exception become a 500.
+    """
 
     def __init__(self, app_inner, *, routes, server):
         self.raw_app = app_inner
         self.payment_app = PaymentMiddlewareASGI(app_inner, routes=routes, server=server)
 
     async def __call__(self, scope, receive, send):
+        if scope["type"] == "http" and INTERNAL_KEY:
+            headers = dict(scope.get("headers", []))
+            key = headers.get(b"x-internal-key", b"").decode(errors="replace")
+            if key and key == INTERNAL_KEY:
+                scope.setdefault("state", {})["_channel"] = "mcp-gateway"
+                return await self.raw_app(scope, receive, send)
         if scope["type"] == "http" and RAPIDAPI_PROXY_SECRET:
             headers = dict(scope.get("headers", []))
             secret = headers.get(b"x-rapidapi-proxy-secret", b"").decode(errors="replace")
             if secret and secret == RAPIDAPI_PROXY_SECRET:
                 return await self.raw_app(scope, receive, send)
-        return await self.payment_app(scope, receive, send)
+        try:
+            return await self.payment_app(scope, receive, send)
+        except Exception as exc:
+            import json as _json
+            print(f"[x402] Facilitator error: {exc}", file=sys.stderr)
+            body = _json.dumps({"error": "Payment service temporarily unavailable"}).encode()
+            await send({"type": "http.response.start", "status": 502, "headers": [
+                [b"content-type", b"application/json"],
+                [b"retry-after", b"30"],
+            ]})
+            await send({"type": "http.response.body", "body": body})
 
 
 # --- Access Log (analytics) ---
@@ -306,7 +337,10 @@ class AccessLogMiddleware:
             qs = scope.get("query_string", b"").decode(errors="replace")
             url = f"{path}?{qs}" if qs else path
 
-            if hdrs.get(b"x-rapidapi-proxy-secret"):
+            ik = hdrs.get(b"x-internal-key", b"").decode(errors="replace")
+            if ik and ik == INTERNAL_KEY:
+                ch = "mcp-gateway"
+            elif RAPIDAPI_PROXY_SECRET and hdrs.get(b"x-rapidapi-proxy-secret", b"").decode(errors="replace") == RAPIDAPI_PROXY_SECRET:
                 ch = "rapidapi"
             elif status == 402:
                 ch = "no-pay"
