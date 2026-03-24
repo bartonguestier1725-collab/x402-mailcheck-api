@@ -107,8 +107,8 @@ async def lifespan(app):
 # --- App ---
 app = FastAPI(
     title="Mailcheck API",
-    description="Email validation API for AI agents. "
-    "Checks syntax, MX records, disposable domains, free providers, role-based addresses, and typos.",
+    description="6 email validation checks in one call — syntax, MX records, disposable detection (5,000+ domains), "
+    "free provider, role-based, and typo suggestion. No API keys, no multiple service integrations.",
     version="0.1.0",
     lifespan=lifespan,
 )
@@ -156,10 +156,11 @@ routes = {
     "POST /validate": RouteConfig(
         accepts=ACCEPTS,
         mime_type="application/json",
-        description="Comprehensive email validation: syntax (RFC 5322), MX records, disposable detection (5,000+ domains), "
-        "free provider check (Gmail, Yahoo, Outlook), role-based detection (admin@, info@), typo suggestion (gmial.com). "
-        "Returns 0-1 confidence score with detailed per-check results. POST protects email addresses from access logs. "
-        "AI agent API for lead qualification, signup fraud prevention, CRM hygiene, email deliverability. Accepts USDC payments on Base and Solana",
+        description="6 email validation checks in one call — syntax (RFC 5322), MX record verification, "
+        "disposable detection (5,000+ domains), free provider identification, role-based address detection (admin@, info@), "
+        "and typo suggestion. Returns a 0-1 confidence score with detailed per-check results. "
+        "POST method protects email addresses from access logs. "
+        "No API keys, no multiple service integrations needed. Accepts USDC payments on Base and Solana",
         unpaid_response_body=_sample({
             "email": "user@gmail.com", "status": "valid", "score": 0.95,
             "syntax_valid": True, "domain": "gmail.com", "mx_found": True,
@@ -200,10 +201,10 @@ routes = {
     "GET /disposable": RouteConfig(
         accepts=ACCEPTS,
         mime_type="application/json",
-        description="Check if a domain is a known disposable or temporary email provider — covers Guerrilla Mail, "
-        "Mailinator, Temp Mail, 10MinuteMail, and 5,000+ disposable domains from a community-curated blocklist "
-        "(CC0 licensed, updated regularly). Returns instant boolean result. "
-        "AI agent API for signup fraud detection, form spam prevention, and email quality filtering. Accepts USDC payments on Base and Solana",
+        description="Instant disposable email detection — checks against 5,000+ known temporary email domains "
+        "(Guerrilla Mail, Mailinator, Temp Mail, 10MinuteMail, and more). Returns boolean result. "
+        "Maintaining this blocklist yourself requires weekly updates from multiple sources. "
+        "Accepts USDC payments on Base and Solana",
         unpaid_response_body=_sample({
             "domain": "guerrillamail.com", "is_disposable": True,
         }),
@@ -228,11 +229,10 @@ routes = {
     "GET /mx": RouteConfig(
         accepts=ACCEPTS,
         mime_type="application/json",
-        description="Look up MX (Mail Exchange) DNS records for any domain — returns whether mail servers exist "
-        "and their hostnames sorted by priority. Essential for verifying email deliverability before sending. "
-        "Supports all TLDs including ccTLDs and new gTLDs. "
-        "AI agent API for email infrastructure verification, domain reputation assessment, "
-        "and bulk email pre-send validation. Accepts USDC payments on Base and Solana",
+        description="MX record lookup for any domain — returns whether mail servers exist and their hostnames sorted by priority. "
+        "Verify email deliverability before sending. "
+        "Supports all TLDs including ccTLDs and new gTLDs. No DNS library setup needed. "
+        "Accepts USDC payments on Base and Solana",
         unpaid_response_body=_sample({
             "domain": "gmail.com", "mx_found": True,
             "mx_records": ["gmail-smtp-in.l.google.com", "alt1.gmail-smtp-in.l.google.com"],
@@ -381,18 +381,17 @@ async def x402_discovery(request: Request):
         ],
         "instructions": (
             "# Mailcheck API\n\n"
-            "Email validation for AI agents. Checks syntax, MX records, disposable domains, "
-            "free providers, role-based addresses, and typos.\n\n"
+            "6 email validation checks in one call. No API keys, no multiple service integrations.\n\n"
+            "## Why use this?\n"
+            "- Individual checks require separate libraries (DNS, disposable blocklist, typo detection)\n"
+            "- This API combines all 6 checks with a single confidence score\n"
+            "- POST method protects email PII from access logs\n\n"
             "## Endpoints\n"
             "- `POST /validate` — Full email validation (JSON body: {\"email\": \"user@example.com\"})\n"
             "- `GET /disposable?domain=example.com` — Disposable domain check\n"
             "- `GET /mx?domain=example.com` — MX record lookup\n\n"
             "## Pricing\n"
-            "All endpoints: $0.005/request (USDC on Base)\n\n"
-            "## Note\n"
-            "POST /validate uses POST to protect email addresses (PII) from access logs.\n\n"
-            "## Contact\n"
-            "GitHub: https://github.com/bartonguestier1725-collab/x402-mailcheck-api"
+            "All endpoints: $0.005/request (USDC on Base)\n"
         ),
     }
 
@@ -417,9 +416,9 @@ async def health_check() -> HealthResponse:
 async def llms_txt():
     """Machine-readable API description for LLM agents."""
     content = """\
-# Email Validation API — Mailcheck
+# Mailcheck API — 6 Email Checks in One Call
 
-> Validate email addresses with syntax, MX record, disposable domain, free provider, role-based, and typo detection checks. Built for AI agents that need to verify emails before sending.
+> Validate email addresses with syntax, MX, disposable (5,000+ domains), free provider, role-based, and typo detection — all in one call. No API keys, no library setup.
 
 ## API Base URL
 
@@ -427,24 +426,17 @@ https://mailcheck.hugen.tokyo
 
 ## Authentication
 
-This API uses the x402 protocol for micropayments. Include a valid x402 payment header with each request. Payments are in USDC on Base chain (eip155:8453).
+x402 micropayments (USDC on Base, eip155:8453).
 
-## Discovery
+## Why This Instead of Doing It Yourself?
 
-- Payment info: GET /.well-known/x402
-- OpenAPI spec: GET /openapi.json
+Individual checks require separate libraries — DNS resolution, a disposable domain blocklist (5,000+ entries, needs weekly updates), typo detection, and free provider lists. This API combines all 6 checks into one call with a single 0-1 confidence score. POST method protects email PII from access logs.
 
 ## Endpoints — $0.005/request
 
 - POST /validate — Full email validation (syntax + MX + disposable + free + role-based + typo suggestion). Send JSON body: {"email": "user@example.com"}
 - GET /disposable?domain={domain} — Check if a domain is a known disposable/temporary email provider
 - GET /mx?domain={domain} — MX record lookup and validation
-
-## Pricing
-
-- All endpoints: $0.005 USDC per request
-- Network: Base (eip155:8453)
-- Payment: x402 protocol (USDC)
 """
     return Response(content=content, media_type="text/plain; charset=utf-8")
 
