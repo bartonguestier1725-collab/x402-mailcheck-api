@@ -147,7 +147,7 @@ if SOLANA_PAY_TO:
 _ALTERNATIVES = {
     "mcp_gateway": {
         "info": "Access this and 2300+ x402 APIs via a single MCP server. Payment brokered for you — supports API keys (no wallet), free trial (World ID), or x402.",
-        "url": "https://mcp-gateway.hugen.tokyo/mcp",
+        "url": "https://mcp.hugen.tokyo/mcp",
         "transport": "streamable-http",
     },
     "api_key": {
