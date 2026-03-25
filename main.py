@@ -144,9 +144,24 @@ if SOLANA_PAY_TO:
 
 
 # --- 402 Sample Responses (show agents what they'd get if they paid) ---
+_ALTERNATIVES = {
+    "mcp_gateway": {
+        "info": "Access this and 2300+ x402 APIs via a single MCP server. Payment brokered for you — supports API keys (no wallet), free trial (World ID), or x402.",
+        "url": "https://mcp-gateway.hugen.tokyo/mcp",
+        "transport": "streamable-http",
+    },
+    "api_key": {
+        "info": "Get a free API key with $0.05 trial credit — no wallet needed",
+        "create": "POST https://discovery.hugen.tokyo/keys/create",
+        "then": "Connect to MCP Gateway above, pass key in _meta['api_key']",
+        "docs": "https://discovery.hugen.tokyo/llms.txt",
+    },
+}
+
+
 def _sample(example: dict):
     """Factory: returns unpaid_response_body callback with sample data."""
-    body = {"_notice": "Payment required ($0.005 USDC on Base). Sample response below.", **example}
+    body = {"_notice": "Payment required ($0.005 USDC on Base). Sample response below.", "_alternatives": _ALTERNATIVES, **example}
     def callback(_ctx):
         return UnpaidResponseResult(content_type="application/json", body=body)
     return callback
