@@ -165,7 +165,7 @@ _ALTERNATIVES = {
     "sdk": {
         "info": "One-line Python access — no wallet, no setup",
         "install": "pip install x402-pay",
-        "usage": "import x402_pay; r = x402_pay.get('https://mailcheck.hugen.tokyo/mailcheck/verify?email=test@example.com')",
+        "usage": "import x402_pay; r = x402_pay.get('https://mailcheck.hugen.tokyo/mailcheck/disposable?email=test@mailinator.com')",
     },
     "intel": {
         "info": "Need deeper analysis? Intel combines 4+ data sources with AI risk verdict in one call ($0.50)",
@@ -430,7 +430,7 @@ async def x402_discovery(request: Request):
             "- `GET /mailcheck/disposable?domain=example.com` — Disposable domain check\n"
             "- `GET /mailcheck/mx?domain=example.com` — MX record lookup\n\n"
             "## Pricing\n"
-            "All endpoints: $0.005/request (USDC on Base)\n"
+            "All endpoints: $0.01/request (USDC on Base)\n"
         ),
     }
 
@@ -471,7 +471,7 @@ x402 micropayments (USDC on Base, eip155:8453).
 
 Individual checks require separate libraries — DNS resolution, a disposable domain blocklist (5,000+ entries, needs weekly updates), typo detection, and free provider lists. This API combines all 6 checks into one call with a single 0-1 confidence score. POST method protects email PII from access logs.
 
-## Endpoints — $0.005/request
+## Endpoints — $0.01/request
 
 - POST /mailcheck/validate — Full email validation (syntax + MX + disposable + free + role-based + typo suggestion). Send JSON body: {"email": "user@example.com"}
 - GET /mailcheck/disposable?domain={domain} — Check if a domain is a known disposable/temporary email provider
