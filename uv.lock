@@ -863,11 +863,11 @@ wheels = [
 
 [[package]]
 name = "disposable-email-domains"
-version = "0.0.162"
+version = "0.0.166"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/97/d2/22d1641a38bd09b4e82b5a9398a964b0aa4ba37d9b0fc52cb9c6f3b44ca0/disposable_email_domains-0.0.162.tar.gz", hash = "sha256:aa0887fb2c7d51182e58c81e693508d764644699afd9ee194a5d145283f2cab8", size = 64055, upload-time = "2026-02-12T13:38:29.537Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/f2/e9/e29fc6a211d938f5bf051bb771901989e4ec00807b940ffb8af4c2ed6711/disposable_email_domains-0.0.166.tar.gz", hash = "sha256:4e540d1cee8719deeacc0d0b9899fa821687d0e54a2d0732d0356b6d2b0e33a2", size = 64258, upload-time = "2026-03-04T02:51:44.5Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/dd/aa/f1d50d1ad8ff84fc9ffd670b419573e18a31e0e9e91ae0309787d96481ca/disposable_email_domains-0.0.162-py2.py3-none-any.whl", hash = "sha256:d8a66d9018fd137683ad2916d3ac9d0ea9f32dccc2a117440cd603b4095f76cc", size = 32739, upload-time = "2026-02-12T13:38:27.918Z" },
+    { url = "https://files.pythonhosted.org/packages/88/23/495c6454f2c3c2cb7f97ce04a696421562ad12fec722b761d67a314cc551/disposable_email_domains-0.0.166-py2.py3-none-any.whl", hash = "sha256:0d8f0e1e4eba5181224f381ea8ccac1710082af1e088cbf1557453f5e9c339cc", size = 32831, upload-time = "2026-03-04T02:51:43.352Z" },
 ]
 
 [[package]]
@@ -1025,7 +1025,7 @@ wheels = [
 
 [[package]]
 name = "fastapi"
-version = "0.131.0"
+version = "0.135.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "annotated-doc" },
@@ -1034,9 +1034,9 @@ dependencies = [
     { name = "typing-extensions" },
     { name = "typing-inspection" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/91/32/158cbf685b7d5a26f87131069da286bf10fc9fbf7fc968d169d48a45d689/fastapi-0.131.0.tar.gz", hash = "sha256:6531155e52bee2899a932c746c9a8250f210e3c3303a5f7b9f8a808bfe0548ff", size = 369612, upload-time = "2026-02-22T16:38:11.252Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/e7/7b/f8e0211e9380f7195ba3f3d40c292594fd81ba8ec4629e3854c353aaca45/fastapi-0.135.1.tar.gz", hash = "sha256:d04115b508d936d254cea545b7312ecaa58a7b3a0f84952535b4c9afae7668cd", size = 394962, upload-time = "2026-03-01T18:18:29.369Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/ff/94/b58ec24c321acc2ad1327f69b033cadc005e0f26df9a73828c9e9c7db7ce/fastapi-0.131.0-py3-none-any.whl", hash = "sha256:ed0e53decccf4459de78837ce1b867cd04fa9ce4579497b842579755d20b405a", size = 103854, upload-time = "2026-02-22T16:38:09.814Z" },
+    { url = "https://files.pythonhosted.org/packages/e4/72/42e900510195b23a56bde950d26a51f8b723846bfcaa0286e90287f0422b/fastapi-0.135.1-py3-none-any.whl", hash = "sha256:46e2fc5745924b7c840f71ddd277382af29ce1cdb7d5eab5bf697e3fb9999c9e", size = 116999, upload-time = "2026-03-01T18:18:30.831Z" },
 ]
 
 [package.optional-dependencies]
@@ -1214,11 +1214,11 @@ wheels = [
 
 [[package]]
 name = "free-email-domains"
-version = "1.0.1"
+version = "1.0.2"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/26/44/b2f8e71cce9be5b9f752bb8459510261b39f5e9cb340d865da05b133f36e/free_email_domains-1.0.1.tar.gz", hash = "sha256:05c81a4ca645e5f57f1466be59f663d767e1475993b3b5a07b361ac8dac0e9b8", size = 27507, upload-time = "2025-01-27T16:45:48.367Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/43/26/75b64b963e99eff350356c978738e4903000cfbae10fd680c5699cbe5cd5/free_email_domains-1.0.2.tar.gz", hash = "sha256:25d3fddbd61ba83bff02466817403f68a805d701507cea85f37dab3a72449348", size = 27683, upload-time = "2026-02-23T19:22:04.538Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/13/80/c2ef902d079fd9680ca8e98c2f709e39e45159fbd11c7a7b9a576faac63a/free_email_domains-1.0.1-py3-none-any.whl", hash = "sha256:3d2f7be52008297c7db65c989cf358553e9100a37a0d28cb090d1787a02e81b2", size = 26835, upload-time = "2025-01-27T16:45:46.562Z" },
+    { url = "https://files.pythonhosted.org/packages/b3/c5/86c2f1679afc091b3f5502593d5078a57bf9d32cfe9a3ceae6e920ab9e51/free_email_domains-1.0.2-py3-none-any.whl", hash = "sha256:c7938a58db6fde82966eaf0b6fa72cff52f0877e1451e5dde2cc9d747eb422f8", size = 27020, upload-time = "2026-02-23T19:22:03.128Z" },
 ]
 
 [[package]]

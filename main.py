@@ -128,6 +128,12 @@ server = x402ResourceServer(facilitator)
 server.register(NETWORK, ExactEvmServerScheme())
 server.register_extension(bazaar_resource_server_extension)
 
+# Payment logging — records settlements to shared SQLite DB
+from payment_logger import PaymentLogger
+_pay_logger = PaymentLogger("mailcheck")
+server.on_after_settle(_pay_logger.log_settlement)
+server.on_settle_failure(_pay_logger.log_failure)
+
 # Solana support (Dexter market — activated by SOLANA_PAY_TO env var)
 SOLANA_PAY_TO = os.getenv("SOLANA_PAY_TO", "")
 if SOLANA_PAY_TO:
@@ -136,7 +142,7 @@ if SOLANA_PAY_TO:
     server.register(SOLANA_MAINNET_CAIP2, ExactSvmServerScheme())
 
 
-PRICE = "$0.005"
+PRICE = "$0.01"
 PAYMENT = PaymentOption(scheme="exact", pay_to=EVM_ADDRESS, price=PRICE, network=NETWORK)
 ACCEPTS = [PAYMENT]
 if SOLANA_PAY_TO:
@@ -151,24 +157,33 @@ _ALTERNATIVES = {
         "transport": "streamable-http",
     },
     "api_key": {
-        "info": "Get a free API key with $0.05 trial credit — no wallet needed",
+        "info": "Get a free API key with $0.05 credit — covers search and broker calls, no wallet needed",
         "create": "POST https://discovery.hugen.tokyo/keys/create",
-        "then": "Connect to MCP Gateway above, pass key in _meta['api_key']",
+        "then": "POST /broker/call with X-API-Key header to call any x402 API",
         "docs": "https://discovery.hugen.tokyo/llms.txt",
+    },
+    "sdk": {
+        "info": "One-line Python access — no wallet, no setup",
+        "install": "pip install x402-pay",
+        "usage": "import x402_pay; r = x402_pay.get('https://mailcheck.hugen.tokyo/mailcheck/verify?email=test@example.com')",
+    },
+    "intel": {
+        "info": "Need deeper analysis? Intel combines 4+ data sources with AI risk verdict in one call ($0.50)",
+        "example": "https://intel.hugen.tokyo/intel/token-report?address=0xdac17f958d2ee523a2206206994597c13d831ec7&chain=base",
     },
 }
 
 
 def _sample(example: dict):
     """Factory: returns unpaid_response_body callback with sample data."""
-    body = {"_notice": "Payment required ($0.005 USDC on Base). Sample response below.", "_alternatives": _ALTERNATIVES, **example}
+    body = {"_notice": f"Payment required ({PRICE} USDC on Base). Sample response below.", "_alternatives": _ALTERNATIVES, **example}
     def callback(_ctx):
         return UnpaidResponseResult(content_type="application/json", body=body)
     return callback
 
 
 routes = {
-    "POST /validate": RouteConfig(
+    "POST /mailcheck/validate": RouteConfig(
         accepts=ACCEPTS,
         mime_type="application/json",
         description="6 email validation checks in one call — syntax (RFC 5322), MX record verification, "
@@ -186,6 +201,9 @@ routes = {
         }),
         extensions={
             "bazaar": {
+                "discoverable": True,
+                "category": "email-validation",
+                "tags": ["email", "mx", "disposable"],
                 "info": {
                     "input": {
                         "type": "http",
@@ -213,7 +231,7 @@ routes = {
             },
         },
     ),
-    "GET /disposable": RouteConfig(
+    "GET /mailcheck/disposable": RouteConfig(
         accepts=ACCEPTS,
         mime_type="application/json",
         description="Instant disposable email detection — checks against 5,000+ known temporary email domains "
@@ -225,6 +243,9 @@ routes = {
         }),
         extensions={
             "bazaar": {
+                "discoverable": True,
+                "category": "email-validation",
+                "tags": ["email", "mx", "disposable"],
                 "info": {
                     "input": {
                         "type": "http",
@@ -241,7 +262,7 @@ routes = {
             },
         },
     ),
-    "GET /mx": RouteConfig(
+    "GET /mailcheck/mx": RouteConfig(
         accepts=ACCEPTS,
         mime_type="application/json",
         description="MX record lookup for any domain — returns whether mail servers exist and their hostnames sorted by priority. "
@@ -254,6 +275,9 @@ routes = {
         }),
         extensions={
             "bazaar": {
+                "discoverable": True,
+                "category": "email-validation",
+                "tags": ["email", "mx", "disposable"],
                 "info": {
                     "input": {
                         "type": "http",
@@ -390,9 +414,9 @@ async def x402_discovery(request: Request):
     return {
         "version": 1,
         "resources": [
-            f"{origin}/validate",
-            f"{origin}/disposable",
-            f"{origin}/mx",
+            f"{origin}/mailcheck/validate",
+            f"{origin}/mailcheck/disposable",
+            f"{origin}/mailcheck/mx",
         ],
         "instructions": (
             "# Mailcheck API\n\n"
@@ -402,9 +426,9 @@ async def x402_discovery(request: Request):
             "- This API combines all 6 checks with a single confidence score\n"
             "- POST method protects email PII from access logs\n\n"
             "## Endpoints\n"
-            "- `POST /validate` — Full email validation (JSON body: {\"email\": \"user@example.com\"})\n"
-            "- `GET /disposable?domain=example.com` — Disposable domain check\n"
-            "- `GET /mx?domain=example.com` — MX record lookup\n\n"
+            "- `POST /mailcheck/validate` — Full email validation (JSON body: {\"email\": \"user@example.com\"})\n"
+            "- `GET /mailcheck/disposable?domain=example.com` — Disposable domain check\n"
+            "- `GET /mailcheck/mx?domain=example.com` — MX record lookup\n\n"
             "## Pricing\n"
             "All endpoints: $0.005/request (USDC on Base)\n"
         ),
@@ -449,14 +473,14 @@ Individual checks require separate libraries — DNS resolution, a disposable do
 
 ## Endpoints — $0.005/request
 
-- POST /validate — Full email validation (syntax + MX + disposable + free + role-based + typo suggestion). Send JSON body: {"email": "user@example.com"}
-- GET /disposable?domain={domain} — Check if a domain is a known disposable/temporary email provider
-- GET /mx?domain={domain} — MX record lookup and validation
+- POST /mailcheck/validate — Full email validation (syntax + MX + disposable + free + role-based + typo suggestion). Send JSON body: {"email": "user@example.com"}
+- GET /mailcheck/disposable?domain={domain} — Check if a domain is a known disposable/temporary email provider
+- GET /mailcheck/mx?domain={domain} — MX record lookup and validation
 """
     return Response(content=content, media_type="text/plain; charset=utf-8")
 
 
-@app.post("/validate")
+@app.post("/mailcheck/validate")
 async def validate_email_endpoint(request: Request) -> ValidateResponse:
     """Accept JSON body, form data, or query parameter — robust against
     RapidAPI Playground which may send non-JSON Content-Type."""
@@ -503,7 +527,7 @@ async def validate_email_endpoint(request: Request) -> ValidateResponse:
     return ValidateResponse(**result)
 
 
-@app.get("/disposable")
+@app.get("/mailcheck/disposable")
 async def disposable_check(
     domain: str = Query(max_length=253, description="Domain to check (e.g., guerrillamail.com)"),
 ) -> DisposableResponse:
@@ -513,7 +537,7 @@ async def disposable_check(
     )
 
 
-@app.get("/mx")
+@app.get("/mailcheck/mx")
 async def mx_check(
     domain: str = Query(max_length=253, description="Domain to look up MX records for (e.g., gmail.com)"),
 ) -> MxResponse:
@@ -523,6 +547,42 @@ async def mx_check(
         mx_found=result["mx_found"],
         mx_records=result["mx_records"],
     )
+
+
+# --- Legacy routes (deprecated, 410 Gone with Link header per RFC 8594) ---
+from fastapi.responses import JSONResponse as _JSONResponseLegacy
+
+
+def _legacy_gone(new_path: str):
+    return _JSONResponseLegacy(
+        status_code=410,
+        headers={"Link": f'<{new_path}>; rel="successor-version"'},
+        content={
+            "error": "Endpoint moved to prefixed path",
+            "new_path": new_path,
+            "message": "Please use the prefixed path. This legacy endpoint will be removed.",
+        },
+    )
+
+
+@app.post("/validate", deprecated=True, include_in_schema=False)
+async def legacy_validate_post():
+    return _legacy_gone("https://mailcheck.hugen.tokyo/mailcheck/validate")
+
+
+@app.get("/validate", deprecated=True, include_in_schema=False)
+async def legacy_validate_get():
+    return _legacy_gone("https://mailcheck.hugen.tokyo/mailcheck/validate")
+
+
+@app.get("/disposable", deprecated=True, include_in_schema=False)
+async def legacy_disposable():
+    return _legacy_gone("https://mailcheck.hugen.tokyo/mailcheck/disposable")
+
+
+@app.get("/mx", deprecated=True, include_in_schema=False)
+async def legacy_mx():
+    return _legacy_gone("https://mailcheck.hugen.tokyo/mailcheck/mx")
 
 
 if __name__ == "__main__":

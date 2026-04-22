@@ -3,7 +3,7 @@
   "info": {
     "title": "Email Validation API",
     "description": "Fast, accurate email validation without risky SMTP probing. 6 checks in 1 call: syntax, MX records, disposable domains (5000+), free provider detection, role-based address detection, and typo suggestions. Built for AI agents and automation.",
-    "version": "1.0.0",
+    "version": "0.1.0",
     "contact": {
       "name": "API Support",
       "url": "https://github.com/bartonguestier1725-collab/x402-mailcheck-api"
