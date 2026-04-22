@@ -128,6 +128,26 @@ server = x402ResourceServer(facilitator)
 server.register(NETWORK, ExactEvmServerScheme())
 server.register_extension(bazaar_resource_server_extension)
 
+import asyncio as _asyncio
+from x402.schemas.hooks import RecoveredSettleResult, SettleFailureContext
+
+async def _retry_settle(ctx: SettleFailureContext) -> RecoveredSettleResult | None:
+    msg = str(ctx.error)
+    if "Missing or invalid parameters" not in msg and "Nonce provided" not in msg:
+        return None
+    print("[mailcheck] Settlement retry in 2s...", flush=True)
+    await _asyncio.sleep(2)
+    try:
+        result = await facilitator.settle(ctx.payment_payload, ctx.requirements)
+        if result.success:
+            print("[mailcheck] Settlement retry succeeded", flush=True)
+            return RecoveredSettleResult(result=result)
+    except Exception:
+        pass
+    return None
+
+server.on_settle_failure(_retry_settle)
+
 # Payment logging — records settlements to shared SQLite DB
 from payment_logger import PaymentLogger
 _pay_logger = PaymentLogger("mailcheck")
