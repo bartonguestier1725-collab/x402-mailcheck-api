@@ -187,9 +187,9 @@ _ALTERNATIVES = {
         "install": "pip install x402-pay",
         "usage": "import x402_pay; r = x402_pay.get('https://mailcheck.hugen.tokyo/mailcheck/disposable?email=test@mailinator.com')",
     },
-    "intel": {
-        "info": "Need deeper analysis? Intel combines 4+ data sources with AI risk verdict in one call ($0.50)",
-        "example": "https://intel.hugen.tokyo/intel/token-report?address=0xdac17f958d2ee523a2206206994597c13d831ec7&chain=base",
+    "scout": {
+        "info": "Search 18+ sources in parallel — Hacker News, GitHub, npm, Reddit, X, and more ($0.01/source or $0.25 multi-search)",
+        "example": "https://scout.hugen.tokyo/scout/multi?q=email+verification+api",
     },
 }
 
